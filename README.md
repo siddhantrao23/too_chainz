@@ -1,3 +1,4 @@
 # too_chainz
 
-blockchain buzzwording
+blockchain from scratch in rust   
+one buzzword at a time ;:)  
