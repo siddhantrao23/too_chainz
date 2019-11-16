@@ -1,6 +1,7 @@
 use super::*;
 use std::collections::HashSet;
 
+#[derive(Clone)]
 pub struct Output {
     pub to_addr: Address,
     pub value: u64,
@@ -37,14 +38,14 @@ impl Transaction {
             .sum()
     }
 
-    pub fn input_hash(&self) -> HashSet<Hash> {
+    pub fn input_hashes(&self) -> HashSet<Hash> {
         self.inputs
             .iter()
             .map(|input| input.hash())
             .collect::<HashSet<Hash>>()
     }
     
-    pub fn output_hash(&self) -> HashSet<Hash> {
+    pub fn output_hashes(&self) -> HashSet<Hash> {
         self.outputs
             .iter()
             .map(|output| output.hash())
