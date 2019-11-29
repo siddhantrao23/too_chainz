@@ -1,9 +1,18 @@
 use super::*;
+use std::rc::Rc;
 use std::collections::HashSet;
 
 pub struct Blockchain {
-    pub blocks: Vec<Block>,
+    pub head: Link<Block>,
+    pub no_of_blocks: i32,
     unspent_outputs: HashSet<Hash>,
+}
+
+type Link<Block> = Option<Rc<Node<Block>>>;
+
+pub struct Node<Block> {
+    elem: Block,
+    next: Link<Block>,
 }
 
 #[derive(Debug)]
@@ -21,13 +30,29 @@ pub enum BlockChainValidationErr {
 impl Blockchain {
     pub fn new() -> Self {
         Blockchain {
-            blocks: vec![],
+            head: None,
+            no_of_blocks: 0,
             unspent_outputs: HashSet::new(),
         }
     }
 
+    pub fn head(&self) -> Option<&Block> {
+        self.head.as_ref().map(|node| &node.elem)
+    }
+
+    pub fn push(&self, block: Block) -> Blockchain {
+        Blockchain {
+            head: Some(Rc::new(Node {
+                elem: block,
+                next: self.head.clone(),
+            })),
+            no_of_blocks: self.no_of_blocks + 1,
+            unspent_outputs: self.unspent_outputs,
+        }
+    } 
+
     pub fn update_with_block (&mut self, block: Block) -> Result<(), BlockChainValidationErr> {
-        let i = self.blocks.len();
+        let i = self.no_of_blocks;
 
         if block.index != i as u32 {
             return Err(BlockChainValidationErr::MismatchIndex);
@@ -35,13 +60,17 @@ impl Blockchain {
             return Err(BlockChainValidationErr::InvalidHash);
         } else if i != 0 {
             //Another block
-            let prev_block = &self.blocks[i - 1];
-            if block.timestamp <= prev_block.timestamp {
-                return Err(BlockChainValidationErr::AchronologicalTimestamp);
-            } else if block.prev_block_hash != prev_block.hash() {
-                return Err(BlockChainValidationErr::MismatchPreviousHash);
+            let prev_block = self.head();
+            match prev_block {
+                None => return Err(BlockChainValidationErr::MismatchPreviousHash),
+                Some(prev_block) => {
+                    if block.timestamp <= prev_block.timestamp {
+                        return Err(BlockChainValidationErr::AchronologicalTimestamp);
+                    } else if block.prev_block_hash != prev_block.hash() {
+                        return Err(BlockChainValidationErr::MismatchPreviousHash);
+                    }
+                }
             }
-
         } else {
             //Genesis block
             if block.prev_block_hash != vec![0; 32] {
@@ -91,7 +120,7 @@ impl Blockchain {
             self.unspent_outputs.extend(block_created);
         }
 
-        self.blocks.push(block);
+        self.push(block);
 
         Ok(())
     }
