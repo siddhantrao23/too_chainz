@@ -1,4 +1,5 @@
 # too_chainz
 
-blockchain from scratch in rust   
+super basic blockchain from scratch in rust  
+  
 one buzzword at a time ;:)  
