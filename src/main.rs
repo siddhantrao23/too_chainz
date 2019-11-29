@@ -21,7 +21,7 @@ fn main() {
     genesis_block.mine();
     println!("Mined genisis block {:?}", &genesis_block);
 
-    let mut last_hash = genesis_block.hash.clone();
+    let last_hash = genesis_block.hash.clone();
 
     let mut blockchain = Blockchain::new();
 
