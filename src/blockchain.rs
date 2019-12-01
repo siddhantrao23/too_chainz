@@ -1,5 +1,4 @@
 use super::*;
-use std::rc::Rc;
 use std::collections::HashSet;
 
 pub struct Blockchain {
@@ -8,18 +7,24 @@ pub struct Blockchain {
     unspent_outputs: HashSet<Hash>,
 }
 
-type Link<Block> = Option<Rc<Node<Block>>>;
+type Link<Block> = Option<Box<Node<Block>>>;
 
 pub struct Node<Block> {
     elem: Block,
     next: Link<Block>,
 }
 
+pub struct Iter<'a, Block> {
+    next: Option<&'a Node<Block>>,
+}
+
+
 #[derive(Debug)]
 pub enum BlockChainValidationErr {
     MismatchIndex,
     InvalidHash,
     AchronologicalTimestamp,
+    InvalidPrevBlock,
     MismatchPreviousHash,
     InvalidGenisisBlockFormat,
     InvalidInput,
@@ -36,20 +41,24 @@ impl Blockchain {
         }
     }
 
-    pub fn head(&self) -> Option<&Block> {
-        self.head.as_ref().map(|node| &node.elem)
+    pub fn push(&mut self, block: Block) {
+        let new_node = Box::new(Node {
+            elem: block,
+            next: self.head.take(),
+        });
+
+        self.head = Some(new_node);
     }
 
-    pub fn push(&self, block: Block) -> Blockchain {
-        Blockchain {
-            head: Some(Rc::new(Node {
-                elem: block,
-                next: self.head.clone(),
-            })),
-            no_of_blocks: self.no_of_blocks + 1,
-            unspent_outputs: self.unspent_outputs,
-        }
-    } 
+    pub fn peek(&self) -> Option<&Block> {
+        self.head.as_ref().map(|node| {
+            &node.elem
+        })
+    }
+
+    pub fn iter(&self) -> Iter<Block> {
+        Iter { next: self.head.as_ref().map(|node| &**node) }
+    }
 
     pub fn update_with_block (&mut self, block: Block) -> Result<(), BlockChainValidationErr> {
         let i = self.no_of_blocks;
@@ -60,9 +69,9 @@ impl Blockchain {
             return Err(BlockChainValidationErr::InvalidHash);
         } else if i != 0 {
             //Another block
-            let prev_block = self.head();
+            let prev_block = self.peek();
             match prev_block {
-                None => return Err(BlockChainValidationErr::MismatchPreviousHash),
+                None => return Err(BlockChainValidationErr::InvalidPrevBlock),
                 Some(prev_block) => {
                     if block.timestamp <= prev_block.timestamp {
                         return Err(BlockChainValidationErr::AchronologicalTimestamp);
@@ -80,7 +89,7 @@ impl Blockchain {
 
         if let Some((coinbase, transactions)) = block.transactions.split_first(){
             if !coinbase.is_coinbase() {
-                return Err(BlockChainValidationErr::InvalidGenisisBlockFormat);
+                return Err(BlockChainValidationErr::InvalidCoinbaseTransaction);
             }
 
             let mut block_spent: HashSet<Hash> = HashSet::new();
@@ -121,7 +130,19 @@ impl Blockchain {
         }
 
         self.push(block);
+        
+        self.no_of_blocks += 1;
 
         Ok(())
+    }
+}
+
+impl<'a, Block> Iterator for Iter<'a, Block> {
+    type Item = &'a Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next.map(|node| {
+            self.next = node.next.as_ref().map(|node| &**node);
+            &node.elem
+        })
     }
 }
